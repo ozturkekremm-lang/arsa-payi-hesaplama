@@ -4,7 +4,7 @@ from functools import reduce
 import math
 from decimal import Decimal, getcontext
 
-# Virgülden sonraki hassasiyeti 28 basamağa set ediyoruz (Gerekirse artırılabilir)
+# Virgülden sonraki hassasiyeti 28 basamağa set ediyoruz
 getcontext().prec = 28
 
 
@@ -48,24 +48,18 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
     h_df = edited_h.dropna(subset=["Hissedar", "Pay", "Payda"])
     d_df = edited_d.dropna(subset=["Daire No", "Brüt m2"])
 
-    # 1. HUKUKİ DENETİM: PAYLAR TOPLAMI KESİN OLARAK 1 Mİ? (Decimal ile hassas kontrol)
+    # 1. HUKUKİ DENETİM: PAYLAR TOPLAMI KESİN OLARAK 1 Mİ?
     toplam_pay_orani = sum(Decimal(str(h["Pay"])) / Decimal(str(h["Payda"])) for _, h in h_df.iterrows())
 
     if toplam_pay_orani != Decimal('1.0'):
         st.error(f"❌ HUKUKİ HATA: Tapu payları toplamı tam olarak 1 etmiyor! (Mevcut Toplam: {toplam_pay_orani})")
     else:
         # HESAPLAMA ÖN HAZIRLIĞI
-        # Metrekareleri Decimal'e çeviriyoruz
         toplam_m2 = Decimal(str(d_df.drop_duplicates(subset=["Daire No"])["Brüt m2"].sum()))
-
-        # Paydaların EKOK'unu alıyoruz
         ekok_p = ekok_bul(h_df["Payda"].astype(int).tolist())
-
-        # Nihai ölçeklenebilir payda (Kayıpları önlemek için metrekare çarpanı ile tam sayı taban genişletme)
-        # Metrekare küsuratları da kaybolmasın diye Decimal hassasiyetiyle büyük bir nihai payda tabanı oluşturulur
         nihai_payda = int(Decimal(str(ekok_p)) * toplam_m2 * Decimal('10000'))
 
-        # Hissedarların Mutlak Arsa Payı Hakları (Kayıpsız Tam Sayı Karşılığı)
+        # Hissedarların Mutlak Arsa Payı Hakları
         h_haklar_orijinal = {}
         for _, h in h_df.iterrows():
             hissedar_adi = str(h["Hissedar"]).strip()
@@ -116,7 +110,7 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
                 if verilecek_pay > h_haklar_calisma[sahibi]:
                     tahsis_hatasi = True
                     hata_mesajlari.append(
-                        f"❌ HAK İHLALİ: {sahibi} adlı kişiye {d_no} nolu dairede hakkından fazla tahsis yapıldı! (Eksik kalan hakkı yetmiyor)")
+                        f"❌ HAK İHLALİ: {sahibi} adlı kişiye {d_no} nolu dairede hakkından fazla tahsis yapıldı!")
                 else:
                     daire_paylari[d_no][sahibi] = daire_paylari[d_no].get(sahibi, 0) + verilecek_pay
                     h_haklar_calisma[sahibi] -= verilecek_pay
@@ -127,7 +121,7 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
                 st.error(msg)
             st.warning("Lütfen tahsis oranlarını veya hissedar haklarını düzeltin.")
         else:
-            # 3. ADIM: KALAN BOŞLUKLARI OTOMATİK TAMAMLAMA (KUSURATSIZ BAKİYE USULÜ)
+            # 3. ADIM: KALAN BOŞLUKLARI OTOMATİK TAMAMLAMA (BAKİYE USULÜ)
             for d_no, info in daire_ozellikleri.items():
                 d_toplam_pay = int((info["m2"] / toplam_m2) * Decimal(str(nihai_payda)))
                 mevcut_pay = sum(daire_paylari[d_no].values())
@@ -152,15 +146,15 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
                 malikler = {k: v for k, v in daire_paylari[d_no].items() if v > 0}
                 hissedar_sayisi = len(malikler)
 
-                # Her dairenin kendi alt kırılımlarının toplamını kontrol etmek için
-                daire_ici_gercek_toplam = sum(malikler.values())
+                # Değişken adı buradaki kullanımla eşitlendi (Hata Çözümü)
+                daire_ici_toplam_pay = sum(malikler.values())
 
                 first_row = True
                 for malik, pay in malikler.items():
                     if hissedar_sayisi == 1:
                         daire_ici_hisse = "Tam"
                     else:
-                        daire_ici_hisse = f"{pay} / {daire_ici_toplam}"
+                        daire_ici_hisse = f"{pay} / {daire_ici_toplam_pay}"
 
                     final_list.append({
                         "Blok Adı": info["blok"] if first_row else "",
@@ -168,7 +162,7 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
                         "B.B. No": d_no if first_row else "",
                         "Niteliği": info["nitelik"] if first_row else "",
                         "B.B. m2": float(info["m2"]) if first_row else "",
-                        "B.B. Toplam Pay": f"{daire_ici_toplam} / {nihai_payda}" if first_row else "",
+                        "B.B. Toplam Pay": f"{daire_ici_toplam_pay} / {nihai_payda}" if first_row else "",
                         "Malik": malik,
                         "Daire İçi Hisse": daire_ici_hisse,
                         "Genel Arsa Payı": f"{pay} / {nihai_payda}"
@@ -178,7 +172,7 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
             st.subheader("📋 Resmi Arsa Payı Cetveli")
             st.table(pd.DataFrame(final_list))
 
-            # GEOMETRİK VE MATEMATİKSEL KONTROL (0 hata payı kontrolü)
+            # SON DOĞRULAMA
             hatali_bakiye = False
             for isim, bakiye in h_haklar_calisma.items():
                 if bakiye != 0:
