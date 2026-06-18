@@ -19,7 +19,7 @@ def ekok_bul(sayilar):
 
 
 st.set_page_config(page_title="Arsa Payı Hesaplama", layout="wide")
-st.title("🛡️ Yüksek Hassasiyetli Bağımsız Bölüm Arsa Payı Hesaplaması")
+st.title("🛡️ Hassas Bağımsız Bölüm Arsa Payı Hesaplaması")
 
 # 1. TAPU KAYITLARI
 st.sidebar.header("1. Tapu Hisseleri")
@@ -57,7 +57,10 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
         # HESAPLAMA ÖN HAZIRLIĞI
         toplam_m2 = Decimal(str(d_df.drop_duplicates(subset=["Daire No"])["Brüt m2"].sum()))
         ekok_p = ekok_bul(h_df["Payda"].astype(int).tolist())
-        nihai_payda = int(Decimal(str(ekok_p)) * toplam_m2 * Decimal('10000'))
+
+        # DÜZELTME: Fazladan sıfır ekleyen çarpan (* 10000) kaldırıldı.
+        # Sadece saf matematiksel taban kullanılıyor.
+        nihai_payda = int(Decimal(str(ekok_p)) * toplam_m2)
 
         # Hissedarların Mutlak Arsa Payı Hakları
         h_haklar_orijinal = {}
@@ -146,7 +149,6 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
                 malikler = {k: v for k, v in daire_paylari[d_no].items() if v > 0}
                 hissedar_sayisi = len(malikler)
 
-                # Değişken adı buradaki kullanımla eşitlendi (Hata Çözümü)
                 daire_ici_toplam_pay = sum(malikler.values())
 
                 first_row = True
@@ -172,7 +174,7 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
             st.subheader("📋 Resmi Arsa Payı Cetveli")
             st.table(pd.DataFrame(final_list))
 
-            # SON DOĞRULAMA
+            # SON DOĞRULAMA (0 toleranslı tam kontrol bakiye)
             hatali_bakiye = False
             for isim, bakiye in h_haklar_calisma.items():
                 if bakiye != 0:
@@ -182,4 +184,4 @@ if st.button("HAKLARI DENETLE VE HESAPLA"):
 
             if not hatali_bakiye:
                 st.success(
-                    "🎯 MÜKEMMEL UYUM: Matematiksel dağıtım virgülden sonraki tüm basamaklarda %100 hassasiyetle tamamlandı. Artık tek bir birim bile kayıp değil.")
+                    "🎯 Dağıtım işlemi, payda şişirilmeden, doğrudan matematiksel oranlar korunarak hassasiyetle tamamlandı.")
